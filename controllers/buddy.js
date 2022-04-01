@@ -1,6 +1,7 @@
 const Buddy = require("../models/Buddy");
 const User = require("../models/User");
 const fetch = require("node-fetch");
+const mongoose = require("mongoose");
 
 exports.createGroup = (req, res) => {
   const {
@@ -77,19 +78,26 @@ exports.deleteGroup = (req, res) => {
 };
 
 exports.addBuddy = (req, res) => {
-  const { id, name, groupId } = req.body; // id and name of the person to add, groupId of group to which the new memeber will join
+  const { id, username, groupId } = req.body; // id and name of the person to add, groupId of group to which the new memeber will join
   Buddy.updateOne(
     { _id: groupId },
     {
       $addToSet: {
         inGroup: {
-          username: name,
+          username: username,
+          id: id,
+        },
+      },
+      $pull: {
+        requests: {
+          username: username,
           id: id,
         },
       },
     }
   )
     .then((data) => {
+      console.log(data);
       return res.status(200).json({
         message: "Success",
       });
@@ -122,30 +130,67 @@ exports.removeBuddy = (req, res) => {
     });
 };
 
-exports.addBuddyRequest = (req, res) => {
-  const { groupId, id, username } = req.body;
-  Buddy.updateOne(
-    {
-      _id: groupId,
-    },
-    {
-      $addToSet: {
-        requests: {
-          username: username,
-          id: id,
+exports.addBuddyRequest = async (req, res) => {
+  try {
+    const { groupId, id, username, hostId } = req.body;
+    const hostDetails = await User.findById(hostId);
+    const memberDetails = await User.findById(id);
+
+    console.log(hostDetails);
+    console.log(memberDetails);
+
+    let similarity = "No similarity metric available!";
+
+    if (memberDetails.quizAnswers !== undefined) {
+      await fetch("https://explora-ml-backend.herokuapp.com/rank_buddies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      },
+        body: JSON.stringify({
+          user_responses: hostDetails.quizAnswers,
+          buddies: [
+            {
+              id: memberDetails.id,
+              response: memberDetails.quizAnswers,
+            },
+          ],
+        }),
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          console.log(result);
+          similarity = (result.rankList[0].similarity * 100).toFixed(2) + "%";
+        });
     }
-  )
-    .then((data) => {
-      return res.status(200).json({
-        message: "Success",
+
+    Buddy.updateOne(
+      {
+        _id: groupId,
+      },
+      {
+        $addToSet: {
+          requests: {
+            username: username,
+            id: id,
+            similarity: similarity,
+          },
+        },
+      }
+    )
+      .then((data) => {
+        return res.status(200).json({
+          message: "Success",
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        return res.status(400).json({ error: "Something went wrong" });
       });
-    })
-    .catch((err) => {
-      console.log(err);
-      return res.status(400).json({ error: "Something went wrong" });
-    });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: "Internal server error!" });
+  }
 };
 
 exports.getBuddySimilarity = async (req, res) => {
@@ -181,6 +226,7 @@ exports.getBuddySimilarity = async (req, res) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-auth-token": localStorage.getItem("token"),
     },
     body: JSON.stringify({
       user_responses: hostResponse,
@@ -208,4 +254,28 @@ exports.getBuddySimilarity = async (req, res) => {
       console.log(err);
       return res.status(500).send({ message: "Internal server error!" });
     });
+};
+
+exports.getUserBuddyGroups = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const allBuddies = await Buddy.find({}).populate("Host", "-password");
+    console.log(allBuddies);
+    const resBuddies = [];
+    allBuddies.forEach((buddy) => {
+      buddy.inGroup.forEach((member) => {
+        if (member.id.toString() == userId) resBuddies.push(buddy);
+      });
+    });
+    console.log(resBuddies);
+    return res.status(200).send({
+      message: "Ok",
+      buddies: resBuddies,
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({
+      message: "Internal Server Error!",
+    });
+  }
 };

@@ -9,6 +9,7 @@ const {
   getBuddyByCity,
   addBuddyRequest,
   getBuddySimilarity,
+  getUserBuddyGroups,
 } = require("../controllers/buddy");
 
 const {
@@ -27,11 +28,12 @@ router.post(
   "/createGroup",
   buddyCreateGroupValidate,
   isBuddyValidated,
-  // isAuthenticated,
+  isAuthenticated,
   createGroup
 );
 router.post(
   "/deleteGroup",
+  isAuthenticated,
   buddyDeleteGroupValidate,
   isBuddyValidated,
   deleteGroup
@@ -40,17 +42,22 @@ router.post("/addBuddy", buddyAddValidate, isBuddyValidated, addBuddy);
 router.post("/removeBuddy", buddyRemoveValidate, isBuddyValidated, removeBuddy);
 router.post(
   "/getBuddybyCity",
+  isAuthenticated,
   getBuddyByCityValidate,
   isBuddyValidated,
   getBuddyByCity
 );
+
 router.post(
   "/addbuddyrequest",
+  isAuthenticated,
   buddyRequestValidate,
   isBuddyValidated,
   addBuddyRequest
 );
 
-router.get("/getbuddysimilarity/:id", getBuddySimilarity);
+router.get("/getbuddysimilarity/:id", isAuthenticated, getBuddySimilarity);
+
+router.get("/userbuddies/:id", isAuthenticated, getUserBuddyGroups);
 
 module.exports = router;
