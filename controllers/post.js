@@ -58,7 +58,7 @@ exports.getPostbyID = (req, res) => {
         Post.findOne({ _id: element.postId })
           .then((data) => {
             posts.push(data);
-            console.log(data);
+            // console.log(data);
           })
           .then(() => {
             // console.log(index, postId.length);
@@ -135,13 +135,11 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
-exports.getSinglePost=async (req,res)=>{
+exports.getSinglePost = async (req, res) => {
   try {
-    const post=await Post.findById(req.params.id);
+    const post = await Post.findById(req.params.id);
     res.status(200).json({
       post,
     });
-  } catch (error) {
-    
-  }
-}
+  } catch (error) {}
+};
